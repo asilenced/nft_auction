@@ -188,6 +188,7 @@ module nft_auction::auction {
 
     }
 
+    //Function for the winner to claim their NFT
     public fun claim_nft(auction: &mut Auction, nft:NFT, ctx: &mut TxContext) {
         
         // Ensure the auction has ended
