@@ -34,7 +34,7 @@ module nft_auction::nft {
         transfer::public_transfer(nft, recipient);        
     }
 
-    // Add these accessor functions
+    //Getter functions for testing
     public fun name(nft: &NFT): &String {
         &nft.name
     }
