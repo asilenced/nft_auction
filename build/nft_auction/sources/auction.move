@@ -50,6 +50,12 @@ module nft_auction::auction {
         winner: address,
     }
 
+    // Auction Ended with No Bids Event
+    public struct AuctionEndedNoBids has copy, drop {
+        auction_id: ID,
+        seller: address,
+    }
+
     //Error constants
     const ETimeExpired: u64 = 0;
 
@@ -58,6 +64,8 @@ module nft_auction::auction {
     const EAuctionNotEnded: u64 = 2;
 
     const ENotWinner: u64 = 3;
+
+    const ENFTAlreadyClaimed: u64 = 4;
 
     const EZeroDuration: u64 = 5;
 
@@ -168,21 +176,34 @@ module nft_auction::auction {
         // Mark the auction as ended
         auction.auction_ended = true;
 
-        //Assign the winners and the final bid price
-        let winner = auction.highest_bidder;
-        let final_price = auction.current_bid;
+        // Check if there were any bids
+        if (auction.highest_bidder == auction.seller) {
+            // No bids were placed, return the NFT to the seller
+            let nft = std::option::extract(&mut auction.nft);
+            transfer::public_transfer(nft, auction.seller);
 
-        // Transfer funds to the seller
-        transfer::public_transfer(
-            coin::take(&mut auction.coin_balance,final_price, ctx),
-            auction.seller
-        );
+            event::emit(AuctionEndedNoBids {
+                auction_id: object::id(auction),
+                seller: auction.seller,
+            });
 
-        event::emit(AuctionEnded {
-            auction_id: object::id(auction),
-            winner,
-            final_price,
-        });
+        } else {
+            // There was a winning bid
+            let winner = auction.highest_bidder;
+            let final_price = auction.current_bid;
+
+            // Transfer funds to the seller
+            transfer::public_transfer(
+                coin::take(&mut auction.coin_balance, final_price, ctx),
+                auction.seller
+            );
+
+            event::emit(AuctionEnded {
+                auction_id: object::id(auction),
+                winner,
+                final_price,
+            });
+        }
 
     }
 
@@ -193,6 +214,8 @@ module nft_auction::auction {
         assert!(auction.auction_ended, EAuctionNotEnded); 
         // Ensure the claimer is the winner
         assert!(tx_context::sender(ctx) == auction.highest_bidder, ENotWinner); 
+        // Ensure the NFT is still in the auction (i.e., it wasn't returned to the seller)
+        assert!(std::option::is_some(&auction.nft), ENFTAlreadyClaimed);
 
         let winner = auction.highest_bidder;
         

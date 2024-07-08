@@ -130,6 +130,39 @@ module nft_auction::auction_tests {
     }
 
     #[test]
+    fun test_end_auction_no_bids() {
+        let mut scenario = test_scenario::begin(@0x1);
+        let ctx = test_scenario::ctx(&mut scenario);
+        let mut clock = clock::create_for_testing(ctx);
+        
+        // Create an NFT and start an auction
+        nft::mint(string::utf8(b"Test NFT"), string::utf8(b"An NFT for auction"), string::utf8(b"https://example.com/test-nft.jpg"), ctx);
+        test_scenario::next_tx(&mut scenario, @0x1);
+        {
+            let nft = test_scenario::take_from_sender<NFT>(&scenario);
+            auction::create_auction(nft, 100, 3600000, &clock, test_scenario::ctx(&mut scenario));
+        };
+
+        // End the auction without any bids
+        clock::increment_for_testing(&mut clock, 3600001);
+        test_scenario::next_tx(&mut scenario, @0x1);
+        {
+            let mut auction = test_scenario::take_shared<Auction>(&scenario);
+            auction::end_auction(&mut auction, &clock, test_scenario::ctx(&mut scenario));
+            test_scenario::return_shared(auction);
+        };
+
+        // Check if the NFT was returned to the seller
+        test_scenario::next_tx(&mut scenario, @0x1);
+        {
+            assert!(test_scenario::has_most_recent_for_sender<NFT>(&scenario), 0);
+        };
+
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_end_auction() {
         let mut scenario = test_scenario::begin(@0x1);
         let ctx = test_scenario::ctx(&mut scenario);
