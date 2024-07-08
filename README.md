@@ -65,35 +65,35 @@ sui move build
 #### Creating an NFT
 
 To create an NFT, use the `mint` function in the `nft` module:
-```move
+```
 nft::mint(name, description, image_url)
 ```
 One can also transfer the NFT to another if they wished with `transfer_nft` function in the same module:
-```move
+```
 nft::transfer_nft(nft,recipient)
 ```
 
 #### Creating an Auction
-To start an auction for an NFT, use the `create_auction` function in the auction module:
-```move
+To start an auction for an NFT, use the `create_auction` function in the auction module. The duration is in milliseconds:
+```
 auction::create_auction(nft, min_bid, duration, clock)
 ```
 
 #### Placing a Bid 
 To place a bid on an auction, use the `place_bid` function in the auction module:
-```move
+```
 auction::place_bid(auction, clock, amount, ctx)
 ```
 
 #### Ending an Auction
 To end an auction, use the `end_auction` function in the auction module:
-```move
+```
 auction::end_auction(auction, clock, ctx)
 ```
 
 #### Claiming an NFT
 The winner can claim their NFT using the claim_nft function in the auction module:
-```move
+```
 auction::claim_nft(auction, ctx)
 ```
 
