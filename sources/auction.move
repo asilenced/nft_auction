@@ -16,7 +16,7 @@ module nft_auction::auction {
         highest_bidder: address, // Address of the highest bidder
         current_bid: u64, // Current highest bid
         min_bid: u64, // minimum bid acceptable
-        end_time: u64, // Auction end time in Sui epoch time units (ms).
+        end_time: u64, // Auction end time in milliseconds (ms), example 500000ms
         coin_balance: Balance<SUI>, //It will assist us in transferring the payment to the seller
         auction_ended: bool, //indicates whether the auction is still ongoing
     }
