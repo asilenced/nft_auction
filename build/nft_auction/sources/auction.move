@@ -11,7 +11,7 @@ module nft_auction::auction {
     //Definition of the auction struct
     public struct Auction has key  {
         id: UID,
-        nft: NFT, // NFT being auctioned  
+        nft: Option<NFT>, // NFT being auctioned  
         seller: address, // The person who instantiates the auction 
         highest_bidder: address, // Address of the highest bidder
         current_bid: u64, // Current highest bid
@@ -59,8 +59,6 @@ module nft_auction::auction {
 
     const ENotWinner: u64 = 3;
 
-    const EWrongNFT: u64 = 4;
-
     const EZeroDuration: u64 = 5;
 
     const EZeroBid: u64 = 6;
@@ -82,7 +80,7 @@ module nft_auction::auction {
 
         let auction = Auction {
             id: object::new(ctx),
-            nft,
+            nft: std::option::some(nft),
             seller,
             highest_bidder: seller,
             current_bid: min_bid,
@@ -189,17 +187,18 @@ module nft_auction::auction {
     }
 
     //Function for the winner to claim their NFT
-    public fun claim_nft(auction: &mut Auction, nft:NFT, ctx: &mut TxContext) {
+    public fun claim_nft(auction: &mut Auction, ctx: &mut TxContext) {
         
         // Ensure the auction has ended
         assert!(auction.auction_ended, EAuctionNotEnded); 
         // Ensure the claimer is the winner
         assert!(tx_context::sender(ctx) == auction.highest_bidder, ENotWinner); 
-        //Ensure the nft in the auction struct is the same as the nft trying to be claimed
-        assert!(object::id(&auction.nft) == object::id(&nft), EWrongNFT);
 
         let winner = auction.highest_bidder;
         
+        // Extract the NFT from the auction struct
+        let nft = std::option::extract(&mut auction.nft);
+
         // Transfer the NFT to the winner
         transfer::public_transfer(nft, winner);
 

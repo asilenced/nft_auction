@@ -212,8 +212,7 @@ module nft_auction::auction_tests {
         test_scenario::next_tx(&mut scenario, @0x2);
         {
             let mut auction = test_scenario::take_shared<Auction>(&scenario);
-            let nft = test_scenario::take_from_sender<NFT>(&scenario);
-            auction::claim_nft(&mut auction, nft, test_scenario::ctx(&mut scenario));
+            auction::claim_nft(&mut auction, test_scenario::ctx(&mut scenario));
             test_scenario::return_shared(auction);
         };
 
