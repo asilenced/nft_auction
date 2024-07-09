@@ -300,6 +300,34 @@ module nft_auction::auction_tests {
 
         clock::destroy_for_testing(clock);
         ts::end(scenario);
+    }
 
+    #[test]
+    #[expected_failure(abort_code = auction::EZeroDuration)]
+    fun test_invalid_duration() {
+        let mut scenario = ts::begin(@0x1);
+        let ctx = ts::ctx(&mut scenario);
+        let clock = clock::create_for_testing(ctx);
+        
+        // Create an NFT and start an auction
+        nft::mint(string::utf8(b"Transfer Test NFT"), string::utf8(b"An NFT to transfer"), string::utf8(b"https://example.com/test-nft.jpg"),ctx);
+        ts::next_tx(&mut scenario, @0x1);
+        {
+            let nft = ts::take_from_sender<NFT>(&scenario);
+            auction::create_auction(nft, 100, 0, &clock, ts::ctx(&mut scenario));
+        };
+
+        // Place a bid
+        ts::next_tx(&mut scenario, @0x2);
+        {
+            let mut auction = ts::take_shared<Auction>(&scenario);
+            let mut coin = coin::mint_for_testing<SUI>(101, ts::ctx(&mut scenario));
+            auction::place_bid(&mut auction, &clock, &mut coin, ts::ctx(&mut scenario));
+            ts::return_shared(auction);
+            coin::burn_for_testing(coin);
+        };
+
+        clock::destroy_for_testing(clock);
+        ts::end(scenario);
     }
 }
