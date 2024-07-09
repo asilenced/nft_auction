@@ -82,7 +82,7 @@ module nft_auction::auction {
         //Add the duration to get the end time for the auction. 
         let end_time = clock::timestamp_ms(clock) + duration;
         //Varibale to store the transaction context
-        let seller = tx_context::sender(ctx);
+        let seller = ctx.sender();
         //The id for the nft
         let nft_id = object::id(&nft);
 
@@ -112,21 +112,16 @@ module nft_auction::auction {
     }
     
     //Function for placing a new bid
-    public entry fun place_bid(auction: &mut Auction, clock: &Clock, amount: &mut Coin<SUI>, ctx: &mut TxContext){
+    public entry fun place_bid(auction: &mut Auction, clock: &Clock, coin: &mut Coin<SUI>, ctx: &mut TxContext){
         
         // Check if the bid amount is zero
-        assert!(coin::value(amount) > 0, EZeroBid);
-        
+        assert!(coin.value() > 0 && coin.value() > auction.current_bid , EZeroBid);
         //Get the time of what it is currently
         let now = clock::timestamp_ms(clock);
         assert!(now < auction.end_time, ETimeExpired);
 
-        //Ensure the amount bidded is greater than the minimum bid
-        let bid_amount = coin::value(amount);
-        assert!(bid_amount > auction.current_bid, EBidTooLow);
-
         //Get the address of the bidder
-        let bidder = tx_context::sender(ctx);
+        let bidder = ctx.sender();
 
         //Refund process of the previous highest bidder
         if (auction.highest_bidder != auction.seller) {
@@ -213,7 +208,7 @@ module nft_auction::auction {
         // Ensure the auction has ended
         assert!(auction.auction_ended, EAuctionNotEnded); 
         // Ensure the claimer is the winner
-        assert!(tx_context::sender(ctx) == auction.highest_bidder, ENotWinner); 
+        assert!(ctx.sender() == auction.highest_bidder, ENotWinner); 
         // Ensure the NFT is still in the auction (i.e., it wasn't returned to the seller)
         assert!(std::option::is_some(&auction.nft), ENFTAlreadyClaimed);
 
