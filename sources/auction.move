@@ -113,12 +113,11 @@ module nft_auction::auction {
     
     //Function for placing a new bid
     public entry fun place_bid(auction: &mut Auction, clock: &Clock, coin: &mut Coin<SUI>, ctx: &mut TxContext){
-        
+        let coin_value = coin.value();
         // Check if the bid amount is zero
-        assert!(coin.value() > 0 && coin.value() > auction.current_bid , EZeroBid);
-        //Get the time of what it is currently
-        let now = clock::timestamp_ms(clock);
-        assert!(now < auction.end_time, ETimeExpired);
+        assert!(coin_value > 0 && coin_value > auction.current_bid , EZeroBid);
+        // check the time 
+        assert!(clock::timestamp_ms(clock) < auction.end_time, ETimeExpired);
 
         //Get the address of the bidder
         let bidder = ctx.sender();
@@ -126,22 +125,22 @@ module nft_auction::auction {
         //Refund process of the previous highest bidder
         if (auction.highest_bidder != auction.seller) {
             transfer::public_transfer(
-                coin::split(amount, auction.current_bid, ctx),
+                coin::split(coin, auction.current_bid, ctx),
                 auction.highest_bidder
             );
         };
 
         //Set the current bid and highest bidder
-        auction.current_bid = bid_amount;
+        auction.current_bid = coin_value;
         auction.highest_bidder = bidder;
 
         //We update the balance in the auction by calling this function
-        update_balance_with_coin(auction,bid_amount,amount,ctx);
+        update_balance_with_coin(auction , coin_value, coin, ctx);
 
         event::emit(BidPlaced {
             auction_id: object::id(auction),
             bidder,
-            amount: bid_amount,
+            amount: coin_value,
         });
 
     }
@@ -157,7 +156,6 @@ module nft_auction::auction {
         let to_add = new_amount - current_value;
         let added = coin::split(payment, to_add, ctx);
         balance::join(current_balance, coin::into_balance(added));
-        
     }
 
 
