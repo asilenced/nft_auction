@@ -381,4 +381,60 @@ module nft_auction::auction_tests {
         clock::destroy_for_testing(clock);
         ts::end(scenario);
     }
+
+    #[test]
+    #[expected_failure(abort_code = auction::ENotWinner)]
+    fun test_invalid_user_claim_nft_error() {
+          let mut scenario = ts::begin(@0x1);
+        let ctx = ts::ctx(&mut scenario);
+        let mut clock = clock::create_for_testing(ctx);
+        
+        // Create an NFT and start an auction
+        nft::mint(string::utf8(b"Transfer Test NFT"), string::utf8(b"An NFT to transfer"), string::utf8(b"https://example.com/test-nft.jpg"),ctx);
+        ts::next_tx(&mut scenario, @0x1);
+        {
+            let nft = ts::take_from_sender<NFT>(&scenario);
+            auction::create_auction(nft, 100, 3600000, &clock, ts::ctx(&mut scenario));
+        };
+
+        // Place a bid
+        ts::next_tx(&mut scenario, @0x2);
+        {
+            let mut auction = ts::take_shared<Auction>(&scenario);
+            let mut coin = coin::mint_for_testing<SUI>(200, ts::ctx(&mut scenario));
+            auction::place_bid(&mut auction, &clock, &mut coin, ts::ctx(&mut scenario));
+            ts::return_shared(auction);
+            coin::burn_for_testing(coin);
+        };
+
+        // End the auction
+        clock::increment_for_testing(&mut clock, 3600001);
+        ts::next_tx(&mut scenario, @0x1);
+        {
+            let mut auction = ts::take_shared<Auction>(&scenario);
+            let cap = ts::take_from_sender<AuctionCap>(&scenario);
+
+            auction::end_auction(&cap, &mut auction, &clock, ts::ctx(&mut scenario));
+
+            ts::return_shared(auction);
+            ts::return_to_sender(&scenario, cap);
+        };
+
+        // Claim the NFT
+        ts::next_tx(&mut scenario, @0x3);
+        {
+            let mut auction = ts::take_shared<Auction>(&scenario);
+            auction::claim_nft(&mut auction, ts::ctx(&mut scenario));
+            ts::return_shared(auction);
+        };
+
+        // Check if the NFT was transferred to the winner
+        ts::next_tx(&mut scenario, @0x3);
+        {
+            assert!(ts::has_most_recent_for_sender<NFT>(&scenario), 0);
+        };
+
+        clock::destroy_for_testing(clock);
+        ts::end(scenario);
+    }
 }
