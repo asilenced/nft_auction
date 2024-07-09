@@ -21,28 +21,21 @@ module nft_auction::nft {
             description: description,
             image_url: image_url,
         };
-
-         //Create variable so as to send the nft to creator.
-        let sender = tx_context::sender(ctx);
-
         //Transfer the nft to the owner
-        transfer::public_transfer(nft, sender);
+        transfer::public_transfer(nft, ctx.sender());
         
     }
 
-    public entry fun transfer_nft(nft: NFT, recipient: address) {
-        transfer::public_transfer(nft, recipient);        
-    }
-
     //Getter functions for testing
+    #[test_only]
     public fun name(nft: &NFT): &String {
         &nft.name
     }
-
+    #[test_only]
     public fun description(nft: &NFT): &String {
         &nft.description
     }
-
+    #[test_only]
     public fun image_url(nft: &NFT): &String {
         &nft.image_url
     }

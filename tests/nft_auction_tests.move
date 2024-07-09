@@ -50,7 +50,7 @@ module nft_auction::auction_tests {
         test_scenario::next_tx(&mut scenario, @0x1);
         {
             let nft_test = test_scenario::take_from_sender<NFT>(&scenario);
-            nft::transfer_nft(nft_test, @0x2);
+            transfer::public_transfer(nft_test, @0x2);
         };
         
         // Check if the NFT was transferred to the new address
