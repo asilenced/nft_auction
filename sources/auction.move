@@ -8,6 +8,21 @@ module nft_auction::auction {
     use sui::clock::{Self, Clock};
     use sui::event;
 
+    //Error constants
+    const ETimeExpired: u64 = 0;
+
+    const ENotOwner: u64 = 1;
+
+    const EAuctionNotEnded: u64 = 2;
+
+    const ENotWinner: u64 = 3;
+
+    const ENFTAlreadyClaimed: u64 = 4;
+
+    const EZeroDuration: u64 = 5;
+
+    const EZeroBid: u64 = 6;
+
     //Definition of the auction struct
     public struct Auction has key  {
         id: UID,
@@ -19,6 +34,11 @@ module nft_auction::auction {
         end_time: u64, // Auction end time in milliseconds (ms), example 500000ms
         coin_balance: Balance<SUI>, //It will assist us in transferring the payment to the seller
         auction_ended: bool, //indicates whether the auction is still ongoing
+    }
+
+    public struct AuctionCap has key, store {
+        id: UID,
+        `for`: ID
     }
 
     //Auction Created Event
@@ -56,21 +76,6 @@ module nft_auction::auction {
         seller: address,
     }
 
-    //Error constants
-    const ETimeExpired: u64 = 0;
-
-    const EBidTooLow: u64 = 1;
-
-    const EAuctionNotEnded: u64 = 2;
-
-    const ENotWinner: u64 = 3;
-
-    const ENFTAlreadyClaimed: u64 = 4;
-
-    const EZeroDuration: u64 = 5;
-
-    const EZeroBid: u64 = 6;
-
     //Function for creating a new auction
     public entry fun create_auction(nft: NFT, min_bid: u64, duration: u64, clock: &Clock, ctx: &mut TxContext) {
 
@@ -98,6 +103,11 @@ module nft_auction::auction {
             auction_ended: false,
         };
 
+        let cap = AuctionCap{
+            id: object::new(ctx),
+            `for`: object::id(&auction)
+        };
+
         event::emit( AuctionCreated {
             auction_id: object::id(&auction),
             nft_id,
@@ -108,7 +118,9 @@ module nft_auction::auction {
         });       
 
         //Share the auction object
-        transfer::share_object(auction);   
+        transfer::share_object(auction);
+        transfer::public_transfer(cap, ctx.sender());
+
     }
     
     //Function for placing a new bid
@@ -146,7 +158,7 @@ module nft_auction::auction {
     }
 
     //Function that will assist us with updating the coin balance of the auction struct
-    public fun update_balance_with_coin(auction: &mut Auction, new_amount: u64, payment: &mut Coin<SUI>,ctx: &mut TxContext) {
+    fun update_balance_with_coin(auction: &mut Auction, new_amount: u64, payment: &mut Coin<SUI>,ctx: &mut TxContext) {
         
         //Extract the value of the balance
         let current_balance = &mut auction.coin_balance;
@@ -160,8 +172,8 @@ module nft_auction::auction {
 
 
     //Function for ending the auction
-    public entry fun end_auction(auction: &mut Auction, clock: &Clock, ctx: &mut TxContext) {
-
+    public entry fun end_auction(cap: &AuctionCap, auction: &mut Auction, clock: &Clock, ctx: &mut TxContext) {
+        assert!(object::id(auction) == cap.`for`, ENotOwner);
         //Get the time currently
         let now = clock::timestamp_ms(clock);
         assert!(now >= auction.end_time, EAuctionNotEnded);
