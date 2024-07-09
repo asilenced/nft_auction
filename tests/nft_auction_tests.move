@@ -4,9 +4,11 @@ module nft_auction::auction_tests {
     use sui::clock::{Self};
     use sui::coin::{Self};
     use sui::sui::SUI;
-    use nft_auction::auction::{Self, Auction};
-    use nft_auction::nft::{Self, NFT};
     use std::string;
+
+    use nft_auction::auction::{Self, Auction, AuctionCap};
+    use nft_auction::nft::{Self, NFT};
+  
 
     // Test helper function to create a test NFT
     // fun create_test_nft(scenario: &mut Scenario) {
@@ -148,8 +150,12 @@ module nft_auction::auction_tests {
         test_scenario::next_tx(&mut scenario, @0x1);
         {
             let mut auction = test_scenario::take_shared<Auction>(&scenario);
-            auction::end_auction(&mut auction, &clock, test_scenario::ctx(&mut scenario));
+            let cap = test_scenario::take_from_sender<AuctionCap>(&scenario);
+
+            auction::end_auction(&cap, &mut auction, &clock, test_scenario::ctx(&mut scenario));
+
             test_scenario::return_shared(auction);
+            test_scenario::return_to_sender(&scenario, cap);
         };
 
         // Check if the NFT was returned to the seller
@@ -192,8 +198,12 @@ module nft_auction::auction_tests {
         test_scenario::next_tx(&mut scenario, @0x1);
         {
             let mut auction = test_scenario::take_shared<Auction>(&scenario);
-            auction::end_auction(&mut auction, &clock, test_scenario::ctx(&mut scenario));
+            let cap = test_scenario::take_from_sender<AuctionCap>(&scenario);
+
+            auction::end_auction(&cap, &mut auction, &clock, test_scenario::ctx(&mut scenario));
+
             test_scenario::return_shared(auction);
+            test_scenario::return_to_sender(&scenario, cap);
         };
 
         // Check if the auction ended
@@ -237,8 +247,12 @@ module nft_auction::auction_tests {
         test_scenario::next_tx(&mut scenario, @0x1);
         {
             let mut auction = test_scenario::take_shared<Auction>(&scenario);
-            auction::end_auction(&mut auction, &clock, test_scenario::ctx(&mut scenario));
+            let cap = test_scenario::take_from_sender<AuctionCap>(&scenario);
+
+            auction::end_auction(&cap, &mut auction, &clock, test_scenario::ctx(&mut scenario));
+
             test_scenario::return_shared(auction);
+            test_scenario::return_to_sender(&scenario, cap);
         };
 
         // Claim the NFT
