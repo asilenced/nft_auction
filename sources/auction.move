@@ -175,9 +175,7 @@ module nft_auction::auction {
     public entry fun end_auction(cap: &AuctionCap, auction: &mut Auction, clock: &Clock, ctx: &mut TxContext) {
         assert!(object::id(auction) == cap.`for`, ENotOwner);
         //Get the time currently
-        let now = clock::timestamp_ms(clock);
-        assert!(now >= auction.end_time, EAuctionNotEnded);
-
+        assert!(clock::timestamp_ms(clock) >= auction.end_time, EAuctionNotEnded);
         // Mark the auction as ended
         auction.auction_ended = true;
 
@@ -209,9 +207,7 @@ module nft_auction::auction {
                 final_price,
             });
         }
-
     }
-
     //Function for the winner to claim their NFT
     public fun claim_nft(auction: &mut Auction, ctx: &mut TxContext) {
         
@@ -219,9 +215,7 @@ module nft_auction::auction {
         assert!(auction.auction_ended, EAuctionNotEnded); 
         // Ensure the claimer is the winner
         assert!(ctx.sender() == auction.highest_bidder, ENotWinner); 
-        // Ensure the NFT is still in the auction (i.e., it wasn't returned to the seller)
-        assert!(std::option::is_some(&auction.nft), ENFTAlreadyClaimed);
-
+    
         let winner = auction.highest_bidder;
         
         // Extract the NFT from the auction struct
@@ -234,9 +228,7 @@ module nft_auction::auction {
             auction_id: object::id(auction),
             winner,
         });
-
     } 
-
     //Getter functions for testing
     public fun current_bid(auction: &Auction): u64 {
     auction.current_bid
@@ -249,5 +241,4 @@ module nft_auction::auction {
     public fun auction_ended(auction: &Auction): bool {
         auction.auction_ended
     }
-
 }
