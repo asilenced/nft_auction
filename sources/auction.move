@@ -8,6 +8,21 @@ module nft_auction::auction {
     use sui::clock::{Self, Clock};
     use sui::event;
 
+    //Error constants
+    const ETimeExpired: u64 = 0;
+
+    const ENotOwner: u64 = 1;
+
+    const EAuctionNotEnded: u64 = 2;
+
+    const ENotWinner: u64 = 3;
+
+    const ENFTAlreadyClaimed: u64 = 4;
+
+    const EZeroDuration: u64 = 5;
+
+    const EZeroBid: u64 = 6;
+
     //Definition of the auction struct
     public struct Auction has key  {
         id: UID,
@@ -19,6 +34,11 @@ module nft_auction::auction {
         end_time: u64, // Auction end time in milliseconds (ms), example 500000ms
         coin_balance: Balance<SUI>, //It will assist us in transferring the payment to the seller
         auction_ended: bool, //indicates whether the auction is still ongoing
+    }
+
+    public struct AuctionCap has key, store {
+        id: UID,
+        `for`: ID
     }
 
     //Auction Created Event
@@ -56,21 +76,6 @@ module nft_auction::auction {
         seller: address,
     }
 
-    //Error constants
-    const ETimeExpired: u64 = 0;
-
-    const EBidTooLow: u64 = 1;
-
-    const EAuctionNotEnded: u64 = 2;
-
-    const ENotWinner: u64 = 3;
-
-    const ENFTAlreadyClaimed: u64 = 4;
-
-    const EZeroDuration: u64 = 5;
-
-    const EZeroBid: u64 = 6;
-
     //Function for creating a new auction
     public entry fun create_auction(nft: NFT, min_bid: u64, duration: u64, clock: &Clock, ctx: &mut TxContext) {
 
@@ -82,7 +87,7 @@ module nft_auction::auction {
         //Add the duration to get the end time for the auction. 
         let end_time = clock::timestamp_ms(clock) + duration;
         //Varibale to store the transaction context
-        let seller = tx_context::sender(ctx);
+        let seller = ctx.sender();
         //The id for the nft
         let nft_id = object::id(&nft);
 
@@ -98,6 +103,11 @@ module nft_auction::auction {
             auction_ended: false,
         };
 
+        let cap = AuctionCap{
+            id: object::new(ctx),
+            `for`: object::id(&auction)
+        };
+
         event::emit( AuctionCreated {
             auction_id: object::id(&auction),
             nft_id,
@@ -108,51 +118,47 @@ module nft_auction::auction {
         });       
 
         //Share the auction object
-        transfer::share_object(auction);   
+        transfer::share_object(auction);
+        transfer::public_transfer(cap, ctx.sender());
+
     }
     
     //Function for placing a new bid
-    public entry fun place_bid(auction: &mut Auction, clock: &Clock, amount: &mut Coin<SUI>, ctx: &mut TxContext){
-        
+    public entry fun place_bid(auction: &mut Auction, clock: &Clock, coin: &mut Coin<SUI>, ctx: &mut TxContext){
+        let coin_value = coin.value();
         // Check if the bid amount is zero
-        assert!(coin::value(amount) > 0, EZeroBid);
-        
-        //Get the time of what it is currently
-        let now = clock::timestamp_ms(clock);
-        assert!(now < auction.end_time, ETimeExpired);
-
-        //Ensure the amount bidded is greater than the minimum bid
-        let bid_amount = coin::value(amount);
-        assert!(bid_amount > auction.current_bid, EBidTooLow);
+        assert!(coin_value > 0 && coin_value > auction.current_bid , EZeroBid);
+        // check the time 
+        assert!(clock::timestamp_ms(clock) < auction.end_time, ETimeExpired);
 
         //Get the address of the bidder
-        let bidder = tx_context::sender(ctx);
+        let bidder = ctx.sender();
 
         //Refund process of the previous highest bidder
         if (auction.highest_bidder != auction.seller) {
             transfer::public_transfer(
-                coin::split(amount, auction.current_bid, ctx),
+                coin::split(coin, auction.current_bid, ctx),
                 auction.highest_bidder
             );
         };
 
         //Set the current bid and highest bidder
-        auction.current_bid = bid_amount;
+        auction.current_bid = coin_value;
         auction.highest_bidder = bidder;
 
         //We update the balance in the auction by calling this function
-        update_balance_with_coin(auction,bid_amount,amount,ctx);
+        update_balance_with_coin(auction , coin_value, coin, ctx);
 
         event::emit(BidPlaced {
             auction_id: object::id(auction),
             bidder,
-            amount: bid_amount,
+            amount: coin_value,
         });
 
     }
 
     //Function that will assist us with updating the coin balance of the auction struct
-    public fun update_balance_with_coin(auction: &mut Auction, new_amount: u64, payment: &mut Coin<SUI>,ctx: &mut TxContext) {
+    fun update_balance_with_coin(auction: &mut Auction, new_amount: u64, payment: &mut Coin<SUI>,ctx: &mut TxContext) {
         
         //Extract the value of the balance
         let current_balance = &mut auction.coin_balance;
@@ -162,17 +168,14 @@ module nft_auction::auction {
         let to_add = new_amount - current_value;
         let added = coin::split(payment, to_add, ctx);
         balance::join(current_balance, coin::into_balance(added));
-        
     }
 
 
     //Function for ending the auction
-    public entry fun end_auction(auction: &mut Auction, clock: &Clock, ctx: &mut TxContext) {
-
+    public entry fun end_auction(cap: &AuctionCap, auction: &mut Auction, clock: &Clock, ctx: &mut TxContext) {
+        assert!(object::id(auction) == cap.`for`, ENotOwner);
         //Get the time currently
-        let now = clock::timestamp_ms(clock);
-        assert!(now >= auction.end_time, EAuctionNotEnded);
-
+        assert!(clock::timestamp_ms(clock) >= auction.end_time, EAuctionNotEnded);
         // Mark the auction as ended
         auction.auction_ended = true;
 
@@ -204,19 +207,15 @@ module nft_auction::auction {
                 final_price,
             });
         }
-
     }
-
     //Function for the winner to claim their NFT
     public fun claim_nft(auction: &mut Auction, ctx: &mut TxContext) {
         
         // Ensure the auction has ended
         assert!(auction.auction_ended, EAuctionNotEnded); 
         // Ensure the claimer is the winner
-        assert!(tx_context::sender(ctx) == auction.highest_bidder, ENotWinner); 
-        // Ensure the NFT is still in the auction (i.e., it wasn't returned to the seller)
-        assert!(std::option::is_some(&auction.nft), ENFTAlreadyClaimed);
-
+        assert!(ctx.sender() == auction.highest_bidder, ENotWinner); 
+    
         let winner = auction.highest_bidder;
         
         // Extract the NFT from the auction struct
@@ -229,9 +228,7 @@ module nft_auction::auction {
             auction_id: object::id(auction),
             winner,
         });
-
     } 
-
     //Getter functions for testing
     public fun current_bid(auction: &Auction): u64 {
     auction.current_bid
@@ -244,5 +241,4 @@ module nft_auction::auction {
     public fun auction_ended(auction: &Auction): bool {
         auction.auction_ended
     }
-
 }
